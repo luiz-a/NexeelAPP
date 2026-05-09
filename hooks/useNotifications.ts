@@ -4,7 +4,6 @@ import * as Notifications from 'expo-notifications'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 
-// Configurar como as notificações aparecem quando o app está aberto
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -20,50 +19,52 @@ export function useNotifications(userId: string | undefined) {
   const responseListener = useRef<any>()
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      console.log('useNotifications: userId vazio, abortando')
+      return
+    }
 
+    console.log('useNotifications: iniciando para userId', userId)
     registrarPush(userId)
 
-    // Escutar notificações recebidas com app aberto
     notificationListener.current = Notifications.addNotificationReceivedListener(
-      notification => {
-        console.log('Notificacao recebida:', notification)
-      }
+      notification => console.log('Notificacao recebida:', notification)
     )
 
-    // Escutar clique na notificação
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      response => {
-        console.log('Notificacao clicada:', response)
-      }
+      response => console.log('Notificacao clicada:', response)
     )
 
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current)
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current)
-      }
+      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current)
+      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current)
     }
   }, [userId])
 }
 
 async function registrarPush(userId: string) {
-  if (!Device.isDevice) return
+  console.log('registrarPush: iniciando...')
 
-  // Pedir permissão
+  if (!Device.isDevice) {
+    console.log('registrarPush: nao e dispositivo fisico, abortando')
+    return
+  }
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync()
-  let finalStatus = existingStatus
+  console.log('registrarPush: permissao atual:', existingStatus)
 
+  let finalStatus = existingStatus
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync()
     finalStatus = status
+    console.log('registrarPush: nova permissao:', finalStatus)
   }
 
-  if (finalStatus !== 'granted') return
+  if (finalStatus !== 'granted') {
+    console.log('registrarPush: permissao negada, abortando')
+    return
+  }
 
-  // Configurar canal no Android
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Cartinho',
@@ -73,14 +74,25 @@ async function registrarPush(userId: string) {
     })
   }
 
-  // Obter token do Expo
-  const tokenData = await Notifications.getExpoPushTokenAsync()
-  const token = tokenData.data
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '3469d2bf-f105-4dbf-9c5c-86dd22381987',
+    })
+    const token = tokenData.data
+    console.log('registrarPush: token obtido:', token)
 
-  // Salvar token no banco
-  await (supabase as any).from('push_tokens').upsert({
-    user_id: userId,
-    token,
-    platform: Platform.OS,
-  }, { onConflict: 'user_id' })
+    const { error } = await (supabase as any).from('push_tokens').upsert({
+      user_id: userId,
+      token,
+      platform: Platform.OS,
+    }, { onConflict: 'user_id' })
+
+    if (error) {
+      console.log('registrarPush: erro ao salvar token:', error)
+    } else {
+      console.log('registrarPush: token salvo com sucesso!')
+    }
+  } catch (err) {
+    console.log('registrarPush: erro ao obter token:', err)
+  }
 }

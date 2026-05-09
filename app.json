@@ -11,6 +11,12 @@
     "ios": {
       "supportsTablet": true
     },
+    "extra": {
+      "eas": {
+        "projectId": "3469d2bf-f105-4dbf-9c5c-86dd22381987"
+      }
+    },
+    "owner": "seu-username-expo",
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
